@@ -1,0 +1,15 @@
+{
+  "domain": "gpslive",
+  "name": "GPSLive",
+  "version": "1.0",
+  "documentation": "https://github.com/HaveYourPhil/homeassistant-gpslive",
+  "dependencies": [],
+  "codeowners": [
+    "@HaveYourPhil"
+  ],
+  "requirements": [
+    "requests"
+  ],
+  "iot_class": "Cloud Polling",
+  "config_flow": true
+}
