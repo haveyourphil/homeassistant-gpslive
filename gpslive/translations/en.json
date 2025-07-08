@@ -1,0 +1,11 @@
+{
+    "title": "GPSLive Tracker",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connect to GPSLive",
+                "description": "Enter your GPSLive API key."
+            }
+        }
+    }
+}

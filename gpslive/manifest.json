@@ -1,15 +1,14 @@
 {
-  "domain": "gpslive",
-  "name": "GPSLive",
-  "version": "1.0",
-  "documentation": "https://github.com/HaveYourPhil/homeassistant-gpslive",
-  "dependencies": [],
-  "codeowners": [
-    "@HaveYourPhil"
-  ],
-  "requirements": [
-    "requests"
-  ],
-  "iot_class": "Cloud Polling",
-  "config_flow": true
+    "domain": "gpslive",
+    "name": "GPSLive Tracker",
+    "version": "0.1.0",
+    "documentation": "https://api.gpslive.app/api-docs/v1",
+    "requirements": ["aiohttp"],
+    "dependencies": [],
+    "codeowners": ["@HaveYourPhil"],
+    "config_flow": true,
+    "iot_class": "cloud_polling",
+    "branding": {
+        "logo": "logo.png"
+    }
 }
