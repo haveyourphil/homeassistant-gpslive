@@ -1,0 +1,9 @@
+{
+  "name": "GPSLive",
+  "content_in_root": false,
+  "domains": ["gpslive"],
+  "country": "global",
+  "homeassistant": "2025.05.0",
+  "iot_class": "cloud_polling",
+  "render_readme": true
+}
