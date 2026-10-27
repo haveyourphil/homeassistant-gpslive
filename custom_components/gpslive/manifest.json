@@ -1,7 +1,6 @@
 {
   "domain": "gpslive",
   "name": "GPSLive Tracker",
-  "categories": ["presence_location.trackers"],
   "codeowners": ["@haveyourphil"],
   "config_flow": true,
   "documentation": "https://github.com/haveyourphil/homeassistant-gpslive",
