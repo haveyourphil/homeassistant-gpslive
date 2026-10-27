@@ -1,4 +1,4 @@
 # This test helper pins a matching Home Assistant release (currently 2026.10.4).
 pytest-homeassistant-custom-component==0.13.375
-aioresponses==0.7.8
+aioresponses==0.7.9
 ruff==0.17.3
