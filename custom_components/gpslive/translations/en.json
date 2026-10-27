@@ -1,11 +1,31 @@
 {
-    "title": "GPSLive Tracker",
-    "config": {
-        "step": {
-            "user": {
-                "title": "Connect to GPSLive",
-                "description": "Enter your GPSLive API key."
-            }
-        }
+  "title": "GPSLive Tracker",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to GPSLive",
+        "description": "Enter your GPSLive API key. One account supplies all of its trackers.",
+        "data": {"api_key": "API key"}
+      },
+      "reauth_confirm": {
+        "title": "Reconnect to GPSLive",
+        "description": "GPSLive rejected your API key. Enter a valid key for the same account to reconnect your existing devices.",
+        "data": {"api_key": "API key"}
+      },
+      "reconfigure": {
+        "title": "Change GPSLive API key",
+        "description": "Enter a new API key for the same GPSLive account. Using a different account may make existing trackers unavailable.",
+        "data": {"api_key": "API key"}
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to retrieve devices from GPSLive. Check your connection and try again.",
+      "invalid_auth": "GPSLive rejected the API key. Check the key and try again."
+    },
+    "abort": {
+      "single_instance_allowed": "GPSLive is already configured. Reconfigure the existing entry to change its API key.",
+      "reauth_successful": "GPSLive API key updated successfully.",
+      "reconfigure_successful": "GPSLive API key updated successfully."
     }
+  }
 }

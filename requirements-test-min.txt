@@ -1,0 +1,2 @@
+# Regression tests against the minimum supported Home Assistant (2025.5.0).
+pytest-homeassistant-custom-component==0.13.243
