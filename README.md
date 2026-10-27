@@ -2,7 +2,7 @@
 
 GPSLive Tracker polls the GPSLive cloud API once per minute and adds a GPS device tracker and six sensors for each tracker: odometer, speed, tracker battery, car battery voltage, status and ignition.
 
-**Version: 0.1.0** · **Home Assistant: 2025.5.0 or later** · **Cloud polling**
+**Version: 1.0.0** · **Home Assistant: 2025.5.0 or later** · **Cloud polling**
 
 The built-in [Marketplace](https://contributors.home-assistant.io/marketplace/) is available from Home Assistant 2026.11. On earlier versions, use HACS. Local brand images are displayed from Home Assistant 2026.3.
 
