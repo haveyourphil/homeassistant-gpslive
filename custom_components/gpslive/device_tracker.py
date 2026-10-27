@@ -1,86 +1,55 @@
-import logging
-import aiohttp
-from datetime import timedelta
-from homeassistant.components.device_tracker import TrackerEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, CoordinatorEntity
-from .const import DOMAIN, API_DEVICE_ENDPOINT, CONF_API_KEY
+"""GPSLive device trackers."""
 
-_LOGGER = logging.getLogger(__name__)
+from typing import Any
 
-async def async_setup_entry(hass, entry, async_add_entities):
-    _LOGGER.debug("[GPSLive] Setting up device tracker")
-    try:
-        coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    except Exception as e:
-        _LOGGER.error("Coordinator not found in hass.data: %s", e)
-        return
+from homeassistant.components.device_tracker import SourceType, TrackerEntity
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    entities = [
-        GPSLiveTracker(coordinator, device["imei"])
-        for device in coordinator.data
-    ]
-    _LOGGER.info("[GPSLive] Initializing %d tracker entities", len(entities))
-    async_add_entities(entities)
+from .coordinator import GPSLiveConfigEntry
+from .entity import GPSLiveEntity
 
-class GPSLiveTracker(CoordinatorEntity, TrackerEntity):
-    def __init__(self, coordinator, imei):
-        super().__init__(coordinator)
-        self._imei = imei
-        _LOGGER.debug("[GPSLive] Tracker entity initialized for IMEI: %s", imei)
 
-    def _device(self):
-        dev = next((d for d in self.coordinator.data if d.get("imei") == self._imei), None)
-        if dev is None:
-            _LOGGER.error("[GPSLive] Device with IMEI %s not found in coordinator data", self._imei)
-        return dev
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: GPSLiveConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Set up trackers from the existing config entry."""
+    coordinator = entry.runtime_data
+    async_add_entities(
+        GPSLiveTracker(coordinator, device["imei"]) for device in coordinator.data
+    )
+
+
+class GPSLiveTracker(GPSLiveEntity, TrackerEntity):
+    """Represent a GPSLive tracker with its original IMEI unique ID."""
+
+    _attr_source_type = SourceType.GPS
 
     @property
-    def unique_id(self):
+    def unique_id(self) -> str:
         return self._imei
 
     @property
-    def name(self):
-        d = self._device()
-        return d.get("name") if d else None
+    def name(self) -> str | None:
+        return self._value("name")
 
     @property
-    def latitude(self):
-        d = self._device()
-        return d["objectData"]["data"].get("latitude") if d else None
+    def latitude(self) -> float | None:
+        return self._value("objectData", "data", "latitude")
 
     @property
-    def longitude(self):
-        d = self._device()
-        return d["objectData"]["data"].get("longitude") if d else None
+    def longitude(self) -> float | None:
+        return self._value("objectData", "data", "longitude")
 
     @property
-    def battery_level(self):
-        d = self._device()
+    def battery_level(self) -> int | None:
         try:
-            return int(d["objectData"]["data"]["params"].get("batp"))
-        except Exception:
+            return int(self._value("objectData", "data", "params", "batp"))
+        except (TypeError, ValueError, OverflowError):
             return None
 
     @property
-    def source_type(self):
-        return "gps"
-
-    @property
-    def extra_state_attributes(self):
-        d = self._device()
-        return {
-            "last_seen": d["objectData"]["data"].get("dtTracker") if d else None,
-        }
-
-    @property
-    def device_info(self):
-        d = self._device()
-        if not d:
-            return None
-        return {
-            "identifiers": {(DOMAIN, self.unique_id)},
-            "name": d.get("name"),
-            "model": d.get("device"),
-            "manufacturer": "GPSLive",
-            "serial_number": d.get("vin"),
-        }
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"last_seen": self._value("objectData", "data", "dtTracker")}

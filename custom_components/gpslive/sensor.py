@@ -1,230 +1,156 @@
-import logging
+"""GPSLive sensors, retaining the existing names, units and unique IDs."""
+
+import math
+
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import (
-    UnitOfSpeed,
-    UnitOfLength,
-    UnitOfElectricPotential,
     PERCENTAGE,
+    UnitOfElectricPotential,
+    UnitOfLength,
+    UnitOfSpeed,
 )
-from .const import DOMAIN
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-_LOGGER = logging.getLogger(__name__)
+from .coordinator import GPSLiveConfigEntry, GPSLiveCoordinator
+from .entity import GPSLiveEntity
 
-async def async_setup_entry(hass, entry, async_add_entities):
-    _LOGGER.debug("[GPSLive] Setting up sensors")
-    try:
-        coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    except Exception as e:
-        _LOGGER.error("Coordinator not found in hass.data: %s", e)
-        return
 
-    sensors = []
-    for device in coordinator.data:
-        imei = device["imei"]
-        sensors += [
-            GPSLiveOdometerSensor(coordinator, imei),
-            GPSLiveSpeedSensor(coordinator, imei),
-            GPSLiveTrackerBatterySensor(coordinator, imei),
-            GPSLiveCarBatterySensor(coordinator, imei),
-            GPSLiveStatusSensor(coordinator, imei),
-            GPSLiveIgnitionSensor(coordinator, imei),
-        ]
-    _LOGGER.info("[GPSLive] Initializing %d sensors", len(sensors))
-    async_add_entities(sensors)
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: GPSLiveConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Set up the same six sensors per tracker."""
+    coordinator = entry.runtime_data
+    async_add_entities(
+        sensor_class(coordinator, device["imei"])
+        for device in coordinator.data
+        for sensor_class in (
+            GPSLiveOdometerSensor,
+            GPSLiveSpeedSensor,
+            GPSLiveTrackerBatterySensor,
+            GPSLiveCarBatterySensor,
+            GPSLiveStatusSensor,
+            GPSLiveIgnitionSensor,
+        )
+    )
 
-class GPSLiveSensor(CoordinatorEntity, SensorEntity):
-    """Base class for all GPSLive sensors."""
-    def __init__(self, coordinator, imei, sensor_type):
-        super().__init__(coordinator)
-        self._imei = imei
+
+class GPSLiveSensor(GPSLiveEntity, SensorEntity):
+    """Base class for GPSLive sensors with legacy naming and identity."""
+
+    def __init__(
+        self, coordinator: GPSLiveCoordinator, imei: str, sensor_type: str
+    ) -> None:
+        super().__init__(coordinator, imei)
         self._sensor_type = sensor_type
-        _LOGGER.debug("[GPSLive] Sensor '%s' initialized for IMEI: %s", sensor_type, imei)
-
-    def _device(self):
-        return next((d for d in self.coordinator.data if d.get("imei") == self._imei), None)
 
     @property
-    def name(self):
-        d = self._device()
-        return f"{d['name']} {self._sensor_type.replace('_', ' ').capitalize()}" if d else f"{self._sensor_type} {self._imei}"
+    def name(self) -> str:
+        if device := self._device():
+            return f"{device.get('name', 'GPSLive')} {self._sensor_type.replace('_', ' ').capitalize()}"
+        return f"{self._sensor_type} {self._imei}"
 
     @property
-    def unique_id(self):
+    def unique_id(self) -> str:
         return f"{self._imei}_{self._sensor_type}"
 
-    @property
-    def device_info(self):
-        d = self._device()
-        if not d:
+    def _number(self, *path: str, integer: bool = True) -> int | float | None:
+        """Convert optional telemetry without swallowing programming errors."""
+        try:
+            value = self._value(*path)
+            result = int(value) if integer else float(value)
+            return result if math.isfinite(result) else None
+        except (TypeError, ValueError, OverflowError):
             return None
-        return {
-            "identifiers": {(DOMAIN, self._imei)},
-            "name": d.get("name"),
-            "model": d.get("device"),
-            "manufacturer": "GPSLive",
-            "serial_number": d.get("vin"),
-        }
 
-# --- Specific Sensors ---
 
 class GPSLiveOdometerSensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    _attr_native_unit_of_measurement = UnitOfLength.MILES
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "odometer")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            return int(d.get("odometer"))
-        except Exception as ex:
-            _LOGGER.debug("Odometer sensor error: %s", ex)
-            return None
+    def native_value(self) -> int | float | None:
+        return self._number("odometer")
 
-    @property
-    def native_unit_of_measurement(self):
-        return UnitOfLength.MILES
-
-    @property
-    def device_class(self):
-        return SensorDeviceClass.DISTANCE
-
-    @property
-    def state_class(self):
-        return SensorStateClass.TOTAL
-
-    @property
-    def suggested_display_precision(self):
-        return 0
 
 class GPSLiveSpeedSensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    _attr_native_unit_of_measurement = UnitOfSpeed.MILES_PER_HOUR
+    _attr_device_class = SensorDeviceClass.SPEED
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "speed")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            return int(float(d["objectData"]["data"]["params"].get("speed")) * 0.621371)
-        except Exception as ex:
-            _LOGGER.debug("Speed sensor error: %s", ex)
-            return None
+    def native_value(self) -> int | None:
+        speed = self._number("objectData", "data", "params", "speed", integer=False)
+        return int(speed * 0.621371) if speed is not None else None
 
-    @property
-    def native_unit_of_measurement(self):
-        return UnitOfSpeed.MILES_PER_HOUR
-
-    @property
-    def device_class(self):
-        return SensorDeviceClass.SPEED
-
-    @property
-    def state_class(self):
-        return SensorStateClass.MEASUREMENT
-
-    @property
-    def suggested_display_precision(self):
-        return 0
 
 class GPSLiveTrackerBatterySensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "tracker_battery")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            return int(d["objectData"]["data"]["params"].get("batp"))
-        except Exception as ex:
-            _LOGGER.debug("Tracker battery sensor error: %s", ex)
-            return None
+    def native_value(self) -> int | float | None:
+        return self._number("objectData", "data", "params", "batp")
 
-    @property
-    def native_unit_of_measurement(self):
-        return PERCENTAGE
-
-    @property
-    def device_class(self):
-        return SensorDeviceClass.BATTERY
-
-    @property
-    def state_class(self):
-        return SensorStateClass.MEASUREMENT
-
-    @property
-    def suggested_display_precision(self):
-        return 0
 
 class GPSLiveCarBatterySensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "car_battery")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            return float(d["objectData"]["data"]["params"].get("accv"))
-        except Exception as ex:
-            _LOGGER.debug("Car battery sensor error: %s", ex)
-            return None
+    def native_value(self) -> int | float | None:
+        return self._number("objectData", "data", "params", "accv", integer=False)
 
-    @property
-    def native_unit_of_measurement(self):
-        return UnitOfElectricPotential.VOLT
-
-    @property
-    def device_class(self):
-        return SensorDeviceClass.VOLTAGE
-
-    @property
-    def state_class(self):
-        return SensorStateClass.MEASUREMENT
-
-    @property
-    def suggested_display_precision(self):
-        return 2
 
 class GPSLiveStatusSensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "status")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            return d["objectData"].get("status")
-        except Exception as ex:
-            _LOGGER.debug("Status sensor error: %s", ex)
-            return None
+    def native_value(self) -> str | None:
+        return self._value("objectData", "status")
 
     @property
-    def icon(self):
-        state = self.native_value
-        if state == "moving":
-            return "mdi:car-arrow-right"
-        return "mdi:car"
+    def icon(self) -> str:
+        return "mdi:car-arrow-right" if self.native_value == "moving" else "mdi:car"
+
 
 class GPSLiveIgnitionSensor(GPSLiveSensor):
-    def __init__(self, coordinator, imei):
+    def __init__(self, coordinator: GPSLiveCoordinator, imei: str) -> None:
         super().__init__(coordinator, imei, "ignition")
 
     @property
-    def native_value(self):
-        d = self._device()
-        try:
-            value = d["objectData"]["data"]["params"].get("io239")
-            return "on" if value == "1" else "off"
-        except Exception as ex:
-            _LOGGER.debug("Ignition sensor error: %s", ex)
+    def native_value(self) -> str | None:
+        value = self._value("objectData", "data", "params", "io239")
+        if value is None:
             return None
+        return "on" if str(value) == "1" else "off"
 
     @property
-    def icon(self):
-        state = self.native_value
-        if state == "on":
-            return "mdi:engine"
-        return "mdi:engine-outline"
+    def icon(self) -> str:
+        return "mdi:engine" if self.native_value == "on" else "mdi:engine-outline"
